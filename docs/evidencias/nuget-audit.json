@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "parameters": "--vulnerable --include-transitive",
+  "sources": [
+    "https://api.nuget.org/v3/index.json"
+  ],
+  "projects": [
+    {
+      "path": "src/Oficina.Api/Oficina.Api.csproj"
+    },
+    {
+      "path": "src/Oficina.Aplicacao/Oficina.Aplicacao.csproj"
+    },
+    {
+      "path": "src/Oficina.Dominio/Oficina.Dominio.csproj"
+    },
+    {
+      "path": "src/Oficina.Infraestrutura/Oficina.Infraestrutura.csproj"
+    },
+    {
+      "path": "tests/Oficina.Tests/Oficina.Tests.csproj"
+    }
+  ]
+}
