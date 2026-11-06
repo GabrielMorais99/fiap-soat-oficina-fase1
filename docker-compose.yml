@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: oficina
+      POSTGRES_USER: oficina
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?preencha POSTGRES_PASSWORD no .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - oficina_db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oficina -d oficina"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      ASPNETCORE_HTTP_PORTS: 8080
+      ConnectionStrings__Oficina: "Host=db;Database=oficina;Username=oficina;Password=${POSTGRES_PASSWORD}"
+      Admin__Usuario: ${OFICINA_ADMIN_USUARIO:-admin}
+      Admin__Senha: ${OFICINA_ADMIN_SENHA:?preencha OFICINA_ADMIN_SENHA no .env}
+      Jwt__Chave: ${OFICINA_JWT_CHAVE:?preencha OFICINA_JWT_CHAVE no .env}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  oficina_db:

@@ -1,0 +1,56 @@
+name: Validação
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Preparar PostgreSQL para integração
+        run: |
+          senha="$(openssl rand -hex 24)"
+          echo "::add-mask::$senha"
+          echo "OFICINA_TESTE_POSTGRES=Host=localhost;Port=5433;Database=postgres;Username=oficina;Password=$senha" >> "$GITHUB_ENV"
+          docker run -d --name oficina-pg -p 127.0.0.1:5433:5432 -e POSTGRES_USER=oficina -e POSTGRES_PASSWORD="$senha" postgres:18
+          for tentativa in {1..30}; do
+            if docker exec oficina-pg pg_isready -h 127.0.0.1 -U oficina; then exit 0; fi
+            sleep 1
+          done
+          docker logs oficina-pg
+          exit 1
+      - name: Testes e cobertura mínima
+        run: |
+          dotnet test Oficina.slnx -c Release -p:CollectCoverage=true '-p:Include=[Oficina.Dominio]*' -p:Threshold=80 -p:ThresholdType=line -p:ThresholdStat=total -p:CoverletOutputFormat=cobertura -p:CoverletOutput=../../artifacts/coverage/
+      - name: Auditoria de dependências NuGet
+        run: |
+          mkdir -p artifacts
+          dotnet list Oficina.slnx package --vulnerable --include-transitive --format json --no-restore | tee artifacts/nuget-audit.json
+      - name: Subir o Compose e verificar a API
+        run: |
+          docker rm -f oficina-pg
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          export OFICINA_ADMIN_SENHA="$(openssl rand -hex 24)"
+          export OFICINA_JWT_CHAVE="$(openssl rand -hex 32)"
+          docker compose up --build -d
+          for tentativa in {1..30}; do
+            if curl --fail --silent http://localhost:8080/health; then exit 0; fi
+            sleep 2
+          done
+          docker compose logs api
+          exit 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evidencias
+          path: artifacts/
